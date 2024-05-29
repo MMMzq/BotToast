@@ -38,6 +38,7 @@ class TextToastState extends State<TextToast> {
               widget.text,
               style: widget.textStyle,
               textAlign: TextAlign.center,
+              maxLines: 3,
             ));
       },
     );
