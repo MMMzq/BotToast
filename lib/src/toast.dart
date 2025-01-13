@@ -1171,131 +1171,133 @@ class BotToast {
   ///如果为[close]则关闭该toast,并且拦截事件停止冒泡
   ///如果为null or [none]则不拦截事件
   ///
-  static CancelFunc showEnhancedWidget({
-    required ToastBuilder toastBuilder,
-    UniqueKey? key,
-    String? groupKey,
-    /*bool*/ Object crossPage = nil,
-    /*bool*/ Object allowClick = nil,
-    /*bool*/ Object clickClose = nil,
-    /*bool*/ Object ignoreContentClick = nil,
-    /*bool*/ Object onlyOne = nil,
-    /*bool*/ Object enableKeyboardSafeArea = nil,
-    BackButtonBehavior? backButtonBehavior = nilBackButtonBehavior,
-    FutureFunc? closeFunc = nilFutureFunc,
-    VoidCallback? onClose = nilVoidCallback,
-    Color backgroundColor = nilColor,
-    WrapWidget? warpWidget = nilWrapWidget,
-    Duration? duration = nilDuration,
-  }) {
-    // ignore: unnecessary_null_comparison
-    assert(enableKeyboardSafeArea != null);
+static CancelFunc showEnhancedWidget({
+  required ToastBuilder toastBuilder,
+  UniqueKey? key,
+  String? groupKey,
+  /*bool*/ Object crossPage = nil,
+  /*bool*/ Object allowClick = nil,
+  /*bool*/ Object clickClose = nil,
+  /*bool*/ Object ignoreContentClick = nil,
+  /*bool*/ Object onlyOne = nil,
+  /*bool*/ Object enableKeyboardSafeArea = nil,
+  BackButtonBehavior? backButtonBehavior = nilBackButtonBehavior,
+  FutureFunc? closeFunc = nilFutureFunc,
+  VoidCallback? onClose = nilVoidCallback,
+  Color backgroundColor = nilColor,
+  WrapWidget? warpWidget = nilWrapWidget,
+  Duration? duration = nilDuration,
+}) {
+  // ignore: unnecessary_null_comparison
+  assert(enableKeyboardSafeArea != null);
 
-    var o = defaultOption.enhanced;
+  var o = defaultOption.enhanced;
 
-    crossPage = returnFirstIfNotNil(crossPage, o.crossPage);
-    allowClick = returnFirstIfNotNil(allowClick, o.allowClick);
-    clickClose = returnFirstIfNotNil(clickClose, o.clickClose);
-    ignoreContentClick = returnFirstIfNotNil(ignoreContentClick, o.ignoreContentClick);
-    onlyOne = returnFirstIfNotNil(onlyOne, o.onlyOne);
-    enableKeyboardSafeArea = returnFirstIfNotNil(enableKeyboardSafeArea, o.enableKeyboardSafeArea);
-    backButtonBehavior = returnFirstIfNotNil(backButtonBehavior, o.backButtonBehavior);
-    closeFunc = returnFirstIfNotNil(closeFunc, o.closeFunc);
-    onClose = returnFirstIfNotNil(onClose, o.onClose);
-    backgroundColor = returnFirstIfNotNil(backgroundColor, o.backgroundColor);
-    warpWidget = returnFirstIfNotNil(warpWidget, o.warpWidget);
-    duration = returnFirstIfNotNil(duration, o.duration);
+  crossPage = returnFirstIfNotNil(crossPage, o.crossPage);
+  allowClick = returnFirstIfNotNil(allowClick, o.allowClick);
+  clickClose = returnFirstIfNotNil(clickClose, o.clickClose);
+  ignoreContentClick = returnFirstIfNotNil(ignoreContentClick, o.ignoreContentClick);
+  onlyOne = returnFirstIfNotNil(onlyOne, o.onlyOne);
+  enableKeyboardSafeArea = returnFirstIfNotNil(enableKeyboardSafeArea, o.enableKeyboardSafeArea);
+  backButtonBehavior = returnFirstIfNotNil(backButtonBehavior, o.backButtonBehavior);
+  closeFunc = returnFirstIfNotNil(closeFunc, o.closeFunc);
+  onClose = returnFirstIfNotNil(onClose, o.onClose);
+  backgroundColor = returnFirstIfNotNil(backgroundColor, o.backgroundColor);
+  warpWidget = returnFirstIfNotNil(warpWidget, o.warpWidget);
+  duration = returnFirstIfNotNil(duration, o.duration);
 
-    assert(isNilOr<bool>([enableKeyboardSafeArea, onlyOne, clickClose, allowClick, ignoreContentClick, crossPage]), 'Must be of bool type');
+  assert(isNilOr<bool>([enableKeyboardSafeArea, onlyOne, clickClose, allowClick, ignoreContentClick, crossPage]), 'Must be of bool type');
 
-    //由于cancelFunc一开始是为空的,所以在赋值之前需要在闭包里使用
-    late final CancelFunc cancelFunc;
-    final CancelFunc dismissFunc = () async {
-      await closeFunc?.call();
-      cancelFunc();
-    };
+  // Declare cancelFunc as non-late and initialize it
+  CancelFunc cancelFunc = () {};
 
-    //onlyOne 功能
-    final List<CancelFunc> cache = (cacheCancelFunc[groupKey ?? defaultKey] ??= []);
-    if (onlyOne == true) {
-      final clone = cache.toList();
-      cache.clear();
-      clone.forEach((cancel) {
-        cancel();
-      });
-    }
-    cache.add(dismissFunc);
+  final CancelFunc dismissFunc = () async {
+    await closeFunc?.call();
+    cancelFunc();
+  };
 
-    //定时功能
-    Timer? timer;
-    if (duration != null) {
-      timer = Timer(duration, () {
-        dismissFunc();
-        timer = null;
-      });
-    }
-
-    //跨页自动关闭
-    BotToastNavigatorObserverProxy? observerProxy;
-    if (!(crossPage == true)) {
-      observerProxy = BotToastNavigatorObserverProxy.all(dismissFunc);
-      BotToastNavigatorObserver.register(observerProxy);
-    }
-
-    //拦截点击返回事件
-    VoidCallback? unRegisterFunc;
-    if (backButtonBehavior == BackButtonBehavior.ignore) {
-      unRegisterFunc = BotToastWidgetsBindingObserver.singleton.registerPopListener(() {
-        return true;
-      });
-    } else if (backButtonBehavior == BackButtonBehavior.close) {
-      unRegisterFunc = BotToastWidgetsBindingObserver.singleton.registerPopListener(() {
-        dismissFunc();
-        unRegisterFunc?.call();
-        unRegisterFunc = null;
-        return true;
-      });
-    }
-
-    cancelFunc = showWidget(
-        groupKey: groupKey,
-        key: key,
-        toastBuilder: (_) {
-          return KeyboardSafeArea(
-            enable: enableKeyboardSafeArea == true,
-            child: ProxyDispose(disposeCallback: () {
-              cache.remove(dismissFunc);
-              if (observerProxy != null) {
-                BotToastNavigatorObserver.unregister(observerProxy);
-              }
-              timer?.cancel();
-              onClose?.call();
-              unRegisterFunc?.call();
-            }, child: Builder(builder: (BuildContext context) {
-              final TextStyle textStyle = Theme.of(context).textTheme.bodyMedium!;
-              Widget child = DefaultTextStyle(
-                  style: textStyle,
-                  child: Stack(children: <Widget>[
-                    Listener(
-                      onPointerDown: clickClose == true ? (_) => dismissFunc() : null,
-                      behavior: allowClick == true ? HitTestBehavior.translucent : HitTestBehavior.opaque,
-                      child: const SizedBox.expand(),
-                    ),
-                    IgnorePointer(
-                      child: Container(color: backgroundColor),
-                    ),
-                    IgnorePointer(
-                      ignoring: ignoreContentClick == true,
-                      child: toastBuilder(dismissFunc),
-                    )
-                  ]));
-              return warpWidget != null ? warpWidget(dismissFunc, child) : child;
-            })),
-          );
-        });
-
-    return dismissFunc;
+  //onlyOne 功能
+  final List<CancelFunc> cache = (cacheCancelFunc[groupKey ?? defaultKey] ??= []);
+  if (onlyOne == true) {
+    final clone = cache.toList();
+    cache.clear();
+    clone.forEach((cancel) {
+      cancel();
+    });
   }
+  cache.add(dismissFunc);
+
+  //定时功能
+  Timer? timer;
+  if (duration != null) {
+    timer = Timer(duration, () {
+      dismissFunc();
+      timer = null;
+    });
+  }
+
+  //跨页自动关闭
+  BotToastNavigatorObserverProxy? observerProxy;
+  if (!(crossPage == true)) {
+    observerProxy = BotToastNavigatorObserverProxy.all(dismissFunc);
+    BotToastNavigatorObserver.register(observerProxy);
+  }
+
+  //拦截点击返回事件
+  VoidCallback? unRegisterFunc;
+  if (backButtonBehavior == BackButtonBehavior.ignore) {
+    unRegisterFunc = BotToastWidgetsBindingObserver.singleton.registerPopListener(() {
+      return true;
+    });
+  } else if (backButtonBehavior == BackButtonBehavior.close) {
+    unRegisterFunc = BotToastWidgetsBindingObserver.singleton.registerPopListener(() {
+      dismissFunc();
+      unRegisterFunc?.call();
+      unRegisterFunc = null;
+      return true;
+    });
+  }
+
+  cancelFunc = showWidget(
+    groupKey: groupKey,
+    key: key,
+    toastBuilder: (_) {
+      return KeyboardSafeArea(
+        enable: enableKeyboardSafeArea == true,
+        child: ProxyDispose(disposeCallback: () {
+          cache.remove(dismissFunc);
+          if (observerProxy != null) {
+            BotToastNavigatorObserver.unregister(observerProxy);
+          }
+          timer?.cancel();
+          onClose?.call();
+          unRegisterFunc?.call();
+        }, child: Builder(builder: (BuildContext context) {
+          final TextStyle textStyle = Theme.of(context).textTheme.bodyMedium!;
+          Widget child = DefaultTextStyle(
+              style: textStyle,
+              child: Stack(children: <Widget>[
+                Listener(
+                  onPointerDown: clickClose == true ? (_) => dismissFunc() : null,
+                  behavior: allowClick == true ? HitTestBehavior.translucent : HitTestBehavior.opaque,
+                  child: const SizedBox.expand(),
+                ),
+                IgnorePointer(
+                  child: Container(color: backgroundColor),
+                ),
+                IgnorePointer(
+                  ignoring: ignoreContentClick == true,
+                  child: toastBuilder(dismissFunc),
+                )
+              ]));
+          return warpWidget != null ? warpWidget(dismissFunc, child) : child;
+        })),
+      );
+    }
+  );
+
+  return dismissFunc;
+}
 
   /// Displays a Widget on the screen that can persist across multiple pages.
   /// [toastBuilder] is the builder function to generate the Widget to be displayed.
